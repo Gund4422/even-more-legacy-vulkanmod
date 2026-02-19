@@ -8,7 +8,7 @@ base.archivesName = "bulkan-babric"
 version = "0.1.0-alpha"
 
 sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_8 // Beta 1.7.3 MUST run on Java 8
+targetCompatibility = JavaVersion.VERSION_1_8 // Beta 1.7.3 MUST run on Java 8
 
 repositories {
     mavenCentral()
