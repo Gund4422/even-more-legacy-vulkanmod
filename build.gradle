@@ -1,104 +1,79 @@
 plugins {
-	id "io.freefair.lombok" version "8.2.2"
-	id "fabric-loom" version "1.9-SNAPSHOT"
-	id "legacy-looming" version "1.9-SNAPSHOT" // Version must be the same as fabric-loom's
+    id "io.freefair.lombok" version "8.2.2"
+    id "fabric-loom" version "1.7.2" // Stable for Babric
+    id "babric-loom-extension" version "1.7.4" // The secret sauce for B1.7.3
 }
 
-base.archivesName = project.archives_base_name
-version = project.mod_version
-group = project.maven_group
+base.archivesName = "bulkan-babric"
+version = "0.1.0-alpha"
 
 sourceCompatibility = JavaVersion.VERSION_17
-targetCompatibility = JavaVersion.VERSION_17
+targetCompatibility = JavaVersion.VERSION_8 // Beta 1.7.3 MUST run on Java 8
 
 repositories {
     mavenCentral()
-    
-    maven {
-        name = 'Jitpack'
-        url = 'https://jitpack.io'
-    }
+    maven { url 'https://maven.glass-launcher.net/babric' }
+    maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.legacyfabric:yarn:${project.minecraft_version}+build.${project.yarn_build}:v2"
+    // 1. BABRIC CORE
+    minecraft "com.mojang:minecraft:b1.7.3"
+    // Use 'barn' for Beta 1.7.3 mappings
+    mappings "net.glasslauncher:barn:b1.7.3+build.20251201:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.16.9"
 
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "com.github.ThatMG393:legacy-lwjgl3:${project.llwjgl3_version}"
-	
-	include(modImplementation("it.unimi.dsi:fastutil:${project.fastutil_core_version}"))
-	include(modImplementation("org.joml:joml:${project.joml_version}"))
-	include(modImplementation("org.slf4j:slf4j-api:${project.slf4j_api_version}"))
-	
-	includeLWJGLModules()
-	includeLWJGLNatives()
+    // 2. LEGACY-LWJGL3 (The Bridge)
+    // This allows B1.7.3 (LWJGL2) to use Vulkan (LWJGL3)
+    modImplementation "com.github.ThatMG393:legacy-lwjgl3:0.4.0" 
+    
+    // 3. VULKAN & UTILS
+    include(modImplementation("it.unimi.dsi:fastutil:8.5.12"))
+    include(modImplementation("org.joml:joml:1.10.5"))
+    
+    includeLWJGLModules()
+    includeLWJGLNatives()
 }
 
+// Strip out the old LWJGL2 so it doesn't conflict with Bulkan
 configurations.all {
-	exclude group: 'org.lwjgl.lwjgl'
+    exclude group: 'org.lwjgl.lwjgl'
+    exclude group: 'org.lwjgl'
 }
 
-processResources {
-	inputs.property "version", project.version
-
-	filesMatching("fabric.mod.json") {
-		expand "version": project.version
-	}
-}
-
-tasks.withType(JavaCompile).configureEach {
-	it.options.encoding = "UTF-8"
-
-	if (JavaVersion.current().isJava9Compatible()) {
-		it.options.release = 17
-	}
-}
-
-jar {
-	from("LICENSE") {
-		rename { "${it}_${base.archivesName.get()}" }
-	}
-}
-
-lombok {
-    version = project.lombok_version
-}
-
-loom { }
-
+// --- LWJGL 3 & VULKAN INJECTION LOGIC ---
 void includeLWJGLModules() {
-	String[] lwjglModules = project.lwjgl_modules.split(',')
-	dependencies {
-		lwjglModules.each { m ->
-			if (m == 'lwjgl') {
-				include(implementation("org.lwjgl:${m}:${project.lwjgl_version}"))
-			} else {
-				if (m == 'glfw') {
-					implementation("org.lwjgl:lwjgl-${m}:${project.lwjgl_version}")
-				} else {
-					include(implementation("org.lwjgl:lwjgl-${m}:${project.lwjgl_version}"))
-				}
-			}
-		}
-	}
+    def lwjgl_version = "3.3.3"
+    def modules = ['lwjgl', 'vulkan', 'glfw', 'stb', 'jemalloc']
+    dependencies {
+        modules.each { m ->
+            include(implementation("org.lwjgl:${m == 'lwjgl' ? m : "lwjgl-$m"}:$lwjgl_version"))
+        }
+    }
 }
 
 void includeLWJGLNatives() {
-	String[] lwjglModules = project.lwjgl_modules.split(',')
-    String[] lwjglNativesArch = project.lwjgl_natives_arch.split(',')
+    def lwjgl_version = "3.3.3"
+    def modules = ['lwjgl', 'vulkan', 'glfw', 'stb', 'jemalloc']
+    // Supports Windows, Linux, and Mac for your HD 620
+    def platforms = ['windows', 'windows-x86', 'linux', 'macos']
     dependencies {
-        lwjglModules.each { m ->
-            lwjglNativesArch.any { n ->
-                if (m == 'vulkan' && (n != 'macos' || n != 'macos-arm64'))
-					return
-
-				if (m == 'lwjgl') {
-					include(runtimeOnly("org.lwjgl:${m}:${project.lwjgl_version}:natives-${n}"))
-				} else {
-					include(runtimeOnly("org.lwjgl:lwjgl-${m}:${project.lwjgl_version}:natives-${n}"))
-				}
+        modules.each { m ->
+            platforms.each { p ->
+                // Skip Vulkan on Mac as per Legacy-VulkanMod logic
+                if (m == 'vulkan' && p.startsWith('macos')) return
+                include(runtimeOnly("org.lwjgl:${m == 'lwjgl' ? m : "lwjgl-$m"}:$lwjgl_version:natives-$p"))
             }
+        }
+    }
+}
+
+loom {
+    // Essential for HD 620 to avoid "Legacy Intel OpenGL" crash
+    runs {
+        client {
+            vmArgs "-Xmx4G", "-XX:+UnlockExperimentalVMOptions"
         }
     }
 }
