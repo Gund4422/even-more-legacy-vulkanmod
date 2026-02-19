@@ -1,15 +1,13 @@
 pluginManagement {
-	repositories {
-		maven {
-			name = "Fabric"
-			url = "https://maven.fabricmc.net/"
-		}
-		maven {
-			name = "legacy-fabric"
-			url = "https://repo.legacyfabric.net/repository/legacyfabric/"
-		}
-		gradlePluginPortal()
-	}
+    repositories {
+        maven { 
+            name = "GlassLauncher"
+            url = "https://maven.glass-launcher.net/babric" 
+        }
+        maven { url = "https://maven.fabricmc.net/" }
+        mavenCentral()
+        gradlePluginPortal()
+    }
 }
 
-rootProject.name = 'LegacyVulkanMod'
+rootProject.name = 'bulkan-babric'
