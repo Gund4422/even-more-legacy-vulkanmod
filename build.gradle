@@ -1,7 +1,7 @@
 plugins {
     id "io.freefair.lombok" version "8.2.2"
-    id "fabric-loom" version "1.7.2" // Stable for babric
-    id "babric-loom-extension" version "1.7.4" // The secret sauce for B1.7.3
+    id "fabric-loom" version "1.9.2" // Stable for babric
+    id "babric-loom-extension" version "1.9.2" // The secret sauce for B1.7.3
 }
 
 base.archivesName = "bulkan-babric"
